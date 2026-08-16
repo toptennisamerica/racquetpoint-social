@@ -234,8 +234,12 @@ def main():
                     if url.startswith("http"):
                         try:
                             h = requests.head(url, timeout=30, allow_redirects=True)
-                            if h.status_code == 200:
-                                print(f"  image URL reachable ({h.headers.get('content-type')})")
+                            ctype = (h.headers.get('content-type') or '').lower()
+                            if h.status_code == 200 and 'jpeg' in ctype:
+                                print(f"  image URL reachable ({ctype})")
+                            elif h.status_code == 200:
+                                warn(f"  image URL is {ctype or 'unknown type'}, not JPEG. "
+                                     f"Instagram only accepts JPEG and will reject this.")
                             else:
                                 warn(f"  image URL returned {h.status_code}. "
                                      f"Instagram will not be able to fetch it.")
