@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Racquet Point · Social Calendar</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#14181f; --muted:#6b7480; --line:#e4e7ec;
+    --accent:#1a5fd0; --ok:#12855b; --warn:#b26a00;
+    --tecnifibre:#c8102e; --wilson:#c8102e; --selkirk:#e03127; --diadem:#1f6feb;
+    --holbrook:#0f7b6c; --service:#5b4bd6; --community:#8a6d3b;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0e1116; --card:#161b22; --ink:#e8eaed; --muted:#9099a5; --line:#262c36; --accent:#5b9bff; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line);
+    padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px}
+  .spacer{flex:1}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  button.f{font:inherit;font-size:12.5px;padding:5px 11px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--muted)}
+  button.f[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  main{padding:20px;max-width:1400px;margin:0 auto}
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
+  article{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    display:flex;flex-direction:column}
+  article.past{opacity:.5}
+  .top{padding:12px 14px;display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--line)}
+  .date{font-weight:650;font-size:14px}
+  .dow{color:var(--muted);font-size:12.5px}
+  .chip{margin-left:auto;font-size:11px;font-weight:650;letter-spacing:.03em;text-transform:uppercase;
+    padding:3px 8px;border-radius:6px;color:#fff}
+  figure{margin:0;background:#0b0d10;aspect-ratio:4/5;display:flex;align-items:center;justify-content:center}
+  figure img{width:100%;height:100%;object-fit:contain;display:block}
+  .body{padding:13px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
+  .txt{white-space:pre-wrap;font-size:13.5px;line-height:1.5;margin:0}
+  .txt.clamp{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+  .more{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);
+    font:inherit;font-size:12.5px;cursor:pointer}
+  .tabs{display:flex;gap:4px}
+  .tab{font:inherit;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:6px;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--muted)}
+  .tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  footer.meta{padding:10px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px}
+  .pill.ok{color:var(--ok);border-color:currentColor}
+  .bio{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted)}
+  code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Racquet Point · Social Calendar</h1>
+    <div class="sub" id="summary">Loading…</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="filters" id="filters"></div>
+</header>
+<main><div class="grid" id="grid"></div><div class="empty" id="empty" hidden></div></main>
+
+<script>
+const BRANDS = ['tecnifibre','wilson','selkirk','diadem','holbrook','service','community'];
+const REPO_RAW = location.hostname.endsWith('github.io')
+  ? '' // same origin when served by Pages
+  : 'https://raw.githubusercontent.com/toptennisamerica/racquetpoint-social/main/';
+
+let POSTS = [], LOG = {}, filter = 'all';
+
+const fmt = iso => {
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d));
+  return {
+    date: dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}),
+    dow:  dt.toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'}),
+    iso
+  };
+};
+const todayNY = () => new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+
+function imgFor(p, ig){
+  if (ig && p.ig_image_url) return p.ig_image_url;
+  if (p.image_url) return p.image_url;
+  const rel = ig ? (p.ig_image || p.image) : (p.image || p.ig_image);
+  return rel ? REPO_RAW + rel : null;
+}
+
+function card(p){
+  const f = fmt(p.date), el = document.createElement('article');
+  if (p.date < todayNY()) el.className = 'past';
+  const brand = p.brand || 'other';
+  const platforms = p.platforms || ['facebook','instagram'];
+  const done = LOG[p.date] || {};
+
+  el.innerHTML = `
+    <div class="top">
+      <span class="date">${f.date}</span><span class="dow">${f.dow}</span>
+      <span class="chip" style="background:var(--${brand},#666)">${brand}</span>
+    </div>
+    <figure></figure>
+    <div class="body">
+      <div class="tabs">
+        <button class="tab" data-v="fb" aria-pressed="true">Facebook</button>
+        <button class="tab" data-v="ig" aria-pressed="false">Instagram</button>
+      </div>
+      <p class="txt clamp"></p>
+      <button class="more">Show more</button>
+    </div>
+    <footer class="meta">
+      ${platforms.map(x=>`<span class="pill${done[x]?' ok':''}">${x}${done[x]?' ✓':''}</span>`).join('')}
+      ${p.bio_link?`<a class="bio" href="${p.bio_link}" target="_blank" rel="noopener">bio link ↗</a>`:''}
+    </footer>`;
+
+  const fig = el.querySelector('figure'), txt = el.querySelector('.txt');
+  const more = el.querySelector('.more');
+  let view = 'fb';
+
+  const render = () => {
+    const ig = view === 'ig';
+    txt.textContent = ig ? (p.ig_caption || p.text) : p.text;
+    const src = imgFor(p, ig);
+    fig.innerHTML = src ? `<img loading="lazy" alt="" src="${src}">` : '';
+    el.querySelectorAll('.tab').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.v === view)));
+  };
+  el.querySelectorAll('.tab').forEach(b =>
+    b.onclick = () => { view = b.dataset.v; render(); });
+  more.onclick = () => {
+    const on = txt.classList.toggle('clamp');
+    more.textContent = on ? 'Show more' : 'Show less';
+  };
+  render();
+  return el;
+}
+
+function draw(){
+  const grid = document.getElementById('grid'), empty = document.getElementById('empty');
+  grid.innerHTML = '';
+  const list = POSTS.filter(p => filter === 'all' || (p.brand || 'other') === filter);
+  list.forEach(p => grid.appendChild(card(p)));
+  empty.hidden = list.length > 0;
+  empty.textContent = list.length ? '' : 'Nothing scheduled for that filter.';
+}
+
+function chrome(){
+  const counts = {};
+  POSTS.forEach(p => counts[p.brand||'other'] = (counts[p.brand||'other']||0)+1);
+  const box = document.getElementById('filters');
+  const mk = (key,label) => {
+    const b = document.createElement('button');
+    b.className='f'; b.textContent=label;
+    b.setAttribute('aria-pressed', String(filter===key));
+    b.onclick = () => { filter = key; chrome(); draw(); };
+    box.appendChild(b);
+  };
+  box.innerHTML='';
+  mk('all', `All ${POSTS.length}`);
+  BRANDS.filter(b=>counts[b]).forEach(b => mk(b, `${b} ${counts[b]}`));
+
+  const upcoming = POSTS.filter(p => p.date >= todayNY()).length;
+  document.getElementById('summary').textContent =
+    `${POSTS.length} posts · ${POSTS[0].date} to ${POSTS[POSTS.length-1].date} · `
+    + `${upcoming} still to publish · 5:30pm ET daily`;
+}
+
+(async () => {
+  try{
+    const q = await fetch(REPO_RAW + 'posts/queue.json', {cache:'no-store'}).then(r=>r.json());
+    POSTS = q.posts.slice().sort((a,b)=>a.date.localeCompare(b.date));
+    try{ LOG = await fetch(REPO_RAW + 'posts/published.json', {cache:'no-store'}).then(r=>r.json()); }
+    catch(_){ LOG = {}; }
+    chrome(); draw();
+  }catch(e){
+    document.getElementById('summary').textContent = 'Could not load queue.json';
+    document.getElementById('grid').innerHTML =
+      `<div class="empty">Could not load <code>posts/queue.json</code>.<br>${e}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
