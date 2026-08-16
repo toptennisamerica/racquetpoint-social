@@ -257,7 +257,12 @@ def main():
             failures.append("instagram: IMAGE_BASE_URL missing and post has no image_url")
         else:
             caption = post.get("ig_caption", post["text"])
-            vid = post.get("ig_video_url") or post.get("video_url")
+            # A landscape video is fine on Facebook but crops badly as a Reel. Setting
+            # ig_image or ig_image_url explicitly opts Instagram out of the video and
+            # gives it a still instead, rather than inheriting video_url.
+            vid = post.get("ig_video_url") or (
+                None if (post.get("ig_image_url") or post.get("ig_image"))
+                else post.get("video_url"))
             # A remote URL is used as-is. Otherwise build one from the repo path.
             remote = None if vid else (post.get("ig_image_url") or post.get("image_url"))
             img = None
