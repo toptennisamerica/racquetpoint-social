@@ -38,7 +38,10 @@
   .chip{margin-left:auto;font-size:11px;font-weight:650;letter-spacing:.03em;text-transform:uppercase;
     padding:3px 8px;border-radius:6px;color:#fff}
   figure{margin:0;background:#0b0d10;aspect-ratio:4/5;display:flex;align-items:center;justify-content:center}
-  figure img{width:100%;height:100%;object-fit:contain;display:block}
+  figure img,figure video{width:100%;height:100%;object-fit:contain;display:block;background:#0b0d10}
+  .vbadge{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.72);color:#fff;font-size:10.5px;
+    font-weight:700;letter-spacing:.05em;padding:3px 7px;border-radius:5px}
+  figure{position:relative}
   .body{padding:13px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
   .txt{white-space:pre-wrap;font-size:13.5px;line-height:1.5;margin:0}
   .txt.clamp{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
@@ -96,7 +99,7 @@ const REPO_RAW = location.hostname.endsWith('github.io')
   ? '' // same origin when served by Pages
   : 'https://raw.githubusercontent.com/toptennisamerica/racquetpoint-social/main/';
 
-let POSTS = [], LOG = {}, filter = 'all', IMAGES = [];
+let POSTS = [], LOG = {}, filter = 'all', IMAGES = [], DEFAULT_TIME = '17:30';
 
 async function loadImageList(){
   const api = 'https://api.github.com/repos/toptennisamerica/racquetpoint-social/contents/';
@@ -124,6 +127,9 @@ const fmt = iso => {
 };
 const todayNY = () => new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
 
+function vidFor(p, ig){
+  return (ig ? p.ig_video_url : null) || p.video_url || null;
+}
 function imgFor(p, ig){
   if (ig && p.ig_image_url) return p.ig_image_url;
   if (p.image_url) return p.image_url;
@@ -140,7 +146,7 @@ function card(p){
 
   el.innerHTML = `
     <div class="top">
-      <span class="date">${f.date}</span><span class="dow">${f.dow}</span>
+      <span class="date">${f.date}</span><span class="dow">${f.dow} · ${p.time || DEFAULT_TIME}</span>
       <span class="chip" style="background:${chipColor(brand)}">${brand}</span>
     </div>
     <figure></figure>
@@ -166,8 +172,14 @@ function card(p){
   const render = () => {
     const ig = view === 'ig';
     txt.textContent = ig ? (p.ig_caption || p.text) : p.text;
-    const src = imgFor(p, ig);
-    fig.innerHTML = src ? `<img loading="lazy" alt="" src="${src}">` : '';
+    const vsrc = vidFor(p, ig);
+    if (vsrc){
+      fig.innerHTML = `<video src="${vsrc}#t=0.5" controls preload="metadata" playsinline></video>`
+        + `<span class="vbadge">${ig ? 'REEL' : 'VIDEO'}</span>`;
+    } else {
+      const src = imgFor(p, ig);
+      fig.innerHTML = src ? `<img loading="lazy" alt="" src="${src}">` : '';
+    }
     el.querySelectorAll('.tab[data-v]').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.v === view)));
   };
@@ -200,7 +212,16 @@ function card(p){
         el.querySelector('.dow').textContent =
           new Date(p.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'});
       };
-      ta.after(dt); el._dt = dt;
+      const tm = document.createElement('input');
+      tm.className='edit'; tm.type='time'; tm.value = p.time || DEFAULT_TIME;
+      tm.onchange = () => {
+        p.time = tm.value || DEFAULT_TIME;
+        el.querySelector('.dow').textContent =
+          new Date(p.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'})
+          + ' · ' + p.time;
+        markDirty(p, el);
+      };
+      ta.after(dt); dt.after(tm); el._tm = tm;
 
       const bsel = document.createElement('select');
       bsel.className = 'edit';
@@ -228,22 +249,26 @@ function card(p){
       dt.after(bsel); el._brand = bsel;
 
       const img = document.createElement('input');
-      img.className='edit'; img.placeholder='image path in repo, or a full https:// URL';
+      img.className='edit';
+      img.placeholder='image path, image URL, or an .mp4 URL for a video post';
       img.setAttribute('list','imglist');
       img.value = view === 'ig'
-        ? (p.ig_image_url || p.ig_image || p.image_url || p.image || '')
-        : (p.image_url || p.image || '');
+        ? (p.ig_video_url || p.video_url || p.ig_image_url || p.ig_image || p.image_url || p.image || '')
+        : (p.video_url || p.image_url || p.image || '');
       img.oninput = () => {
-        const v = img.value.trim(), remote = /^https?:/i.test(v), ig = view === 'ig';
+        const v = img.value.trim(), remote = /^https?:/i.test(v);
+        const isVid = /\.(mp4|mov|m4v)(\?|$)/i.test(v);
+        const ig = view === 'ig';
         if (ig){
-          delete p.ig_image; delete p.ig_image_url;
-          if (v) (remote ? p.ig_image_url = v : p.ig_image = v);
+          delete p.ig_image; delete p.ig_image_url; delete p.ig_video_url;
+          if (v) { if (isVid) p.ig_video_url = v;
+                   else if (remote) p.ig_image_url = v; else p.ig_image = v; }
         } else {
-          delete p.image; delete p.image_url;
-          if (v) (remote ? p.image_url = v : p.image = v);
+          delete p.image; delete p.image_url; delete p.video_url;
+          if (v) { if (isVid) p.video_url = v;
+                   else if (remote) p.image_url = v; else p.image = v; }
         }
-        const src = imgFor(p, ig);
-        fig.innerHTML = src ? `<img alt="" src="${src}">` : '';
+        render();
         markDirty(p, el);
       };
       bsel.after(img); el._img = img;
@@ -268,6 +293,7 @@ function card(p){
       const pEl = document.createElement('p');
       pEl.className = 'txt clamp';
       txt.replaceWith(pEl); txt = pEl;
+      if (el._tm) { el._tm.remove(); el._tm = null; }
       if (el._dt) { el._dt.remove(); el._dt = null; }
       if (el._brand) { el._brand.remove(); el._brand = null; }
       if (el._img) { el._img.remove(); el._img = null; }
@@ -350,7 +376,7 @@ function savebar(){
     <button class="ghost" id="gh">Open GitHub editor</button>
     <button class="ghost" id="dc">Discard</button>`;
   bar.querySelector('#cp').onclick = async e => {
-    const out = JSON.stringify({timezone:'America/New_York', posts:POSTS}, null, 2);
+    const out = JSON.stringify({timezone:'America/New_York', default_time:DEFAULT_TIME, posts:POSTS}, null, 2);
     try { await navigator.clipboard.writeText(out); e.target.textContent='Copied ✓'; }
     catch(_){
       const b=new Blob([out],{type:'application/json'}), u=URL.createObjectURL(b);
@@ -397,6 +423,7 @@ function chrome(){
 (async () => {
   try{
     const q = await fetch(REPO_RAW + 'posts/queue.json', {cache:'no-store'}).then(r=>r.json());
+    DEFAULT_TIME = q.default_time || '17:30';
     POSTS = q.posts.slice().sort((a,b)=>a.date.localeCompare(b.date));
     try{ LOG = await fetch(REPO_RAW + 'posts/published.json', {cache:'no-store'}).then(r=>r.json()); }
     catch(_){ LOG = {}; }

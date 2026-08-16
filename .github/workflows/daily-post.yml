@@ -5,7 +5,7 @@ on:
     # 21:30 UTC = 17:30 America/New_York while EDT is in effect.
     # GitHub cron is always UTC and does not follow DST, so after the November
     # change this lands at 16:30 local. Switch to "30 22 * * *" to hold 17:30.
-    - cron: "30 21 * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:

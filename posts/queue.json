@@ -1,5 +1,6 @@
 {
   "timezone": "America/New_York",
+  "default_time": "17:30",
   "posts": [
     {
       "date": "2026-08-16",

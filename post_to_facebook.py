@@ -180,6 +180,21 @@ def main():
         return
     post = todays[0]
 
+    # Each post may carry its own "time" as HH:MM in the queue's timezone.
+    # The workflow wakes up often; we publish only once that time has passed.
+    default_time = data.get("default_time", "17:30")
+    want = post.get("time", default_time)
+    try:
+        wh, wm = (int(x) for x in want.split(":"))
+    except Exception:
+        warn(f'bad time "{want}" on {today}, falling back to {default_time}')
+        wh, wm = (int(x) for x in default_time.split(":"))
+    now = datetime.now(tz)
+    if not dry and (now.hour, now.minute) < (wh, wm):
+        print(f"Scheduled for {want}, it is {now.strftime('%H:%M')}. Waiting.")
+        return
+    print(f"Scheduled {want}, now {now.strftime('%H:%M')} — clear to publish.")
+
     # A post may restrict itself to certain platforms, e.g. when its image is
     # the wrong aspect ratio for Instagram. Intersect with what was requested.
     if post.get("platforms"):
