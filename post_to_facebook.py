@@ -138,6 +138,7 @@ def main():
     dry = os.environ.get("DRY_RUN") == "1"
     platforms = [p.strip().lower() for p in
                  os.environ.get("PLATFORMS", "facebook,instagram").split(",") if p.strip()]
+    requested = list(platforms)
 
     token = os.environ.get("FB_PAGE_TOKEN")
     page_id = os.environ.get("FB_PAGE_ID")
@@ -156,6 +157,16 @@ def main():
               f"{data['posts'][0]['date']} to {data['posts'][-1]['date']}.")
         return
     post = todays[0]
+
+    # A post may restrict itself to certain platforms, e.g. when its image is
+    # the wrong aspect ratio for Instagram. Intersect with what was requested.
+    if post.get("platforms"):
+        allowed = [p.strip().lower() for p in post["platforms"]]
+        skipped = [p for p in requested if p not in allowed]
+        platforms = [p for p in requested if p in allowed]
+        if skipped:
+            print(f"Post restricts platforms to {', '.join(allowed)}. "
+                  f"Skipping: {', '.join(skipped)}")
 
     log = read_log()
     done = log.get(today, {})

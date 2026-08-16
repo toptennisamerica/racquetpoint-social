@@ -156,29 +156,29 @@ Instagram captions cannot contain clickable links, so each post says "link in bi
 carries a `bio_link` telling you where the bio should point that day. Three weeks queued,
 Aug 16 to Sep 5:
 
-| Date | Bio link |
-|---|---|
-| Aug 16 | Stringing service |
-| Aug 17 | Fire 300 |
-| Aug 18 | Stringing service |
-| Aug 19 | TF-40 315 |
-| Aug 20 | Tour Endurance 6R |
-| Aug 21 | Tecnifibre racquets collection |
-| Aug 22 | racquetpoint.com |
-| Aug 23 | Stringing service |
-| Aug 24 | Pro Staff 97 Classic |
-| Aug 25 | Blade 98 16x19 V10 |
-| Aug 26 | Pro Staff 87 shoes |
-| Aug 27 | Stringing service |
-| Aug 28 | Blade 100UL V10 |
-| Aug 29 | racquetpoint.com |
-| Aug 30 | racquetpoint.com |
-| Aug 31 | Ultra 100 V5 |
-| Sep 1 | Ultra 100 V5 |
-| Sep 2 | Ultra 100UL V5 |
-| Sep 3 | Stringing service |
-| Sep 4 | Ultra 111 V5 |
-| Sep 5 | Ultra Team V5 |
+| Date | Brand | Bio link |
+|---|---|---|
+| 08-16 | service | /products/racquet-restringing-service-and-repair |
+| 08-17 | tecnifibre | /products/tecnifibre-fire-300-tennis-racquet |
+| 08-18 | selkirk | /products/selkirk-courtstrike-pro-3-0-mens-pickleball-shoes |
+| 08-19 | wilson | /products/wilson-blade-98-16x19-v10-tennis-racquet |
+| 08-20 | holbrook | /products/holbrook-fuze-pickleball-paddle |
+| 08-21 | tecnifibre | /collections/tecnifibre-tennis-racquets |
+| 08-22 | community |  |
+| 08-23 | service | /products/racquet-restringing-service-and-repair |
+| 08-24 | diadem | /products/diadem-court-flo-men-s-tennis-shoes |
+| 08-25 | wilson | /products/wilson-pro-staff-97-classic-tennis-racquet |
+| 08-26 | holbrook | /products/holbrook-pro-aero-t-elongated-pickleball-paddle-14mm-16mm |
+| 08-27 | service | /products/racquet-restringing-service-and-repair |
+| 08-28 | wilson | /products/wilson-blade-100ul-v10-tennis-racquet |
+| 08-29 | tecnifibre | /products/tecnifibre-fire-300-tennis-racquet |
+| 08-30 | community |  |
+| 08-31 | wilson | /products/wilson-ultra-100-v5-tennis-racquet |
+| 09-01 | selkirk | /products/selkirk-legacy-pro-mens-pickleball-shoes |
+| 09-02 | tecnifibre | /products/tecnifibre-tour-endurance-6r-white-bag |
+| 09-03 | service | /products/racquet-restringing-service-and-repair |
+| 09-04 | diadem | /products/diadem-court-burst-men-s-shoes-white |
+| 09-05 | wilson | /products/wilson-ultra-team-v5-tennis-racquet |
 
 The workflow log prints the correct link on every run, so you can check the Actions tab
 rather than this table. Two consecutive days point at stringing, so in practice this is
@@ -186,6 +186,33 @@ about fifteen bio changes across the three weeks.
 
 If the daily swap gets tiresome, a link-in-bio landing page with all of them listed
 removes the chore permanently.
+
+---
+
+## Brand rotation and stock discipline
+
+Two rules the calendar follows, both learned the hard way.
+
+**No two consecutive posts share a brand.** Tennis and pickleball alternate too. The
+calendar is checked for adjacent repeats when it is built; the current one has zero.
+
+**Every product is verified before it is written about.** Not just `totalInventory`,
+which lies. The Wilson Pro Staff 87 shoe reported `totalInventory: 32` while variant
+level showed a single pair in one size. Always check `variants { inventoryQuantity }`
+and confirm `status: ACTIVE` with a non-null `publishedAt` before a product goes in the
+queue.
+
+## Per-post platform restriction
+
+A post can limit itself to one platform:
+
+```json
+{ "platforms": ["facebook"] }
+```
+
+Used for the Selkirk posts, because every Selkirk image on the Shopify CDN is 1500x2000,
+a 3:4 ratio. Instagram's minimum is 4:5 and rejects anything taller. Once 4:5 or square
+Selkirk images exist, drop the `platforms` key and they publish to both.
 
 ---
 
