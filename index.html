@@ -57,7 +57,7 @@
   code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
   textarea.edit{width:100%;min-height:190px;resize:vertical;font:inherit;font-size:13.5px;line-height:1.5;
     color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:9px}
-  input.edit{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);
+  input.edit,select.edit{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);
     border:1px solid var(--line);border-radius:6px;padding:5px 8px}
   article.dirty{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
   .savebar{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:50;
@@ -179,6 +179,23 @@ function card(p){
         markDirty(p, el);
       };
       txt.replaceWith(ta); txt = ta;
+      const bsel = document.createElement('select');
+      bsel.className = 'edit';
+      bsel.innerHTML = BRANDS.map(b =>
+        `<option value="${b}"${b === (p.brand||'') ? ' selected' : ''}>${b}</option>`).join('');
+      if (!BRANDS.includes(p.brand)) {
+        bsel.insertAdjacentHTML('afterbegin',
+          `<option value="${p.brand||''}" selected>${p.brand||'(none)'}</option>`);
+      }
+      bsel.onchange = () => {
+        p.brand = bsel.value;
+        const chip = el.querySelector('.chip');
+        chip.textContent = p.brand;
+        chip.style.background = `var(--${p.brand},#666)`;
+        markDirty(p, el); rotationCheck();
+      };
+      ta.after(bsel); el._brand = bsel;
+
       const img = document.createElement('input');
       img.className='edit'; img.placeholder='image path in repo, or a full https:// URL';
       img.setAttribute('list','imglist');
@@ -198,7 +215,7 @@ function card(p){
         fig.innerHTML = src ? `<img alt="" src="${src}">` : '';
         markDirty(p, el);
       };
-      ta.after(img); el._img = img;
+      bsel.after(img); el._img = img;
 
       const bio = document.createElement('input');
       bio.className='edit'; bio.value = p.bio_link || ''; bio.placeholder='bio link';
@@ -210,6 +227,7 @@ function card(p){
       const pEl = document.createElement('p');
       pEl.className = 'txt clamp';
       txt.replaceWith(pEl); txt = pEl;
+      if (el._brand) { el._brand.remove(); el._brand = null; }
       if (el._img) { el._img.remove(); el._img = null; }
       if (el._bio) { el._bio.remove(); el._bio = null; }
       render();
@@ -227,6 +245,23 @@ const dirty = new Set();
 function markDirty(p, el){
   dirty.add(p.date); el.classList.add('dirty'); savebar();
 }
+function rotationCheck(){
+  const sorted = POSTS.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const clash = [];
+  for (let i=1;i<sorted.length;i++)
+    if (sorted[i].brand && sorted[i].brand === sorted[i-1].brand)
+      clash.push(sorted[i].date);
+  let w = document.getElementById('rotwarn');
+  if (!clash.length){ if (w) w.remove(); return; }
+  if (!w){
+    w = document.createElement('div'); w.id='rotwarn';
+    w.style.cssText='margin:0 0 14px;padding:9px 12px;border-radius:9px;font-size:13px;'
+      +'background:#fff4e5;color:#8a5300;border:1px solid #f0c98a';
+    document.querySelector('main').prepend(w);
+  }
+  w.textContent = `Same brand on consecutive days: ${clash.join(', ')}`;
+}
+
 function savebar(){
   let bar = document.getElementById('savebar');
   if (!dirty.size){ if (bar) bar.remove(); return; }
@@ -290,7 +325,7 @@ function chrome(){
     POSTS = q.posts.slice().sort((a,b)=>a.date.localeCompare(b.date));
     try{ LOG = await fetch(REPO_RAW + 'posts/published.json', {cache:'no-store'}).then(r=>r.json()); }
     catch(_){ LOG = {}; }
-    chrome(); draw();
+    chrome(); draw(); rotationCheck();
     loadImageList().then(() => {
       document.getElementById('imglist').innerHTML =
         IMAGES.map(i => `<option value="${i}">`).join('');
