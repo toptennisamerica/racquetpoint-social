@@ -76,13 +76,22 @@
     <div class="sub" id="summary">Loading…</div>
   </div>
   <div class="spacer"></div>
+  <button class="f" id="newpost" style="font-weight:650">+ New post</button>
   <div class="filters" id="filters"></div>
 </header>
 <datalist id="imglist"></datalist>
 <main><div class="grid" id="grid"></div><div class="empty" id="empty" hidden></div></main>
 
 <script>
-const BRANDS = ['tecnifibre','wilson','selkirk','diadem','holbrook','service','community'];
+let BRANDS = ['tecnifibre','wilson','selkirk','diadem','holbrook','service','community'];
+const BUILTIN = new Set(BRANDS);
+// custom tags have no CSS variable, so derive a stable colour from the name
+function chipColor(b){
+  if (!b) return '#666';
+  if (BUILTIN.has(b)) return `var(--${b},#666)`;
+  let h = 0; for (const c of b) h = (h*31 + c.charCodeAt(0)) % 360;
+  return `hsl(${h} 55% 42%)`;
+}
 const REPO_RAW = location.hostname.endsWith('github.io')
   ? '' // same origin when served by Pages
   : 'https://raw.githubusercontent.com/toptennisamerica/racquetpoint-social/main/';
@@ -132,7 +141,7 @@ function card(p){
   el.innerHTML = `
     <div class="top">
       <span class="date">${f.date}</span><span class="dow">${f.dow}</span>
-      <span class="chip" style="background:var(--${brand},#666)">${brand}</span>
+      <span class="chip" style="background:${chipColor(brand)}">${brand}</span>
     </div>
     <figure></figure>
     <div class="body">
@@ -179,22 +188,44 @@ function card(p){
         markDirty(p, el);
       };
       txt.replaceWith(ta); txt = ta;
+      const dt = document.createElement('input');
+      dt.className='edit'; dt.type='date'; dt.value = p.date;
+      dt.onchange = () => {
+        const old = p.date; p.date = dt.value;
+        dirty.add(old); dirty.add(p.date);
+        POSTS.sort((a,b)=>a.date.localeCompare(b.date));
+        markDirty(p, el); rotationCheck();
+        el.querySelector('.date').textContent =
+          new Date(p.date+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+        el.querySelector('.dow').textContent =
+          new Date(p.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',timeZone:'UTC'});
+      };
+      ta.after(dt); el._dt = dt;
+
       const bsel = document.createElement('select');
       bsel.className = 'edit';
       bsel.innerHTML = BRANDS.map(b =>
-        `<option value="${b}"${b === (p.brand||'') ? ' selected' : ''}>${b}</option>`).join('');
+        `<option value="${b}"${b === (p.brand||'') ? ' selected' : ''}>${b}</option>`).join('')
+        + '<option value="__new">+ new tag…</option>';
       if (!BRANDS.includes(p.brand)) {
         bsel.insertAdjacentHTML('afterbegin',
           `<option value="${p.brand||''}" selected>${p.brand||'(none)'}</option>`);
       }
       bsel.onchange = () => {
+        if (bsel.value === '__new'){
+          const name = (prompt('New tag name (lowercase, one word)') || '').trim().toLowerCase();
+          if (!name){ bsel.value = p.brand || BRANDS[0]; return; }
+          if (!BRANDS.includes(name)) BRANDS.push(name);
+          bsel.insertAdjacentHTML('afterbegin', `<option value="${name}">${name}</option>`);
+          bsel.value = name;
+        }
         p.brand = bsel.value;
         const chip = el.querySelector('.chip');
         chip.textContent = p.brand;
-        chip.style.background = `var(--${p.brand},#666)`;
+        chip.style.background = chipColor(p.brand);
         markDirty(p, el); rotationCheck();
       };
-      ta.after(bsel); el._brand = bsel;
+      dt.after(bsel); el._brand = bsel;
 
       const img = document.createElement('input');
       img.className='edit'; img.placeholder='image path in repo, or a full https:// URL';
@@ -217,19 +248,31 @@ function card(p){
       };
       bsel.after(img); el._img = img;
 
+      const del = document.createElement('button');
+      del.className='tab'; del.textContent='Delete this post';
+      del.style.cssText='align-self:flex-start;color:#c0392b;border-color:#c0392b';
+      del.onclick = () => {
+        if (!confirm(`Delete the post on ${p.date}?`)) return;
+        POSTS = POSTS.filter(x => x !== p);
+        dirty.add(p.date); el.remove(); savebar(); chrome(); rotationCheck();
+      };
+      el._del = del;
+
       const bio = document.createElement('input');
       bio.className='edit'; bio.value = p.bio_link || ''; bio.placeholder='bio link';
       bio.oninput = () => { p.bio_link = bio.value; markDirty(p, el); };
-      img.after(bio); el._bio = bio;
+      img.after(bio); bio.after(del); el._bio = bio;
     } else {
       editing = false; editBtn.textContent = 'Edit';
       more.hidden = false;
       const pEl = document.createElement('p');
       pEl.className = 'txt clamp';
       txt.replaceWith(pEl); txt = pEl;
+      if (el._dt) { el._dt.remove(); el._dt = null; }
       if (el._brand) { el._brand.remove(); el._brand = null; }
       if (el._img) { el._img.remove(); el._img = null; }
       if (el._bio) { el._bio.remove(); el._bio = null; }
+      if (el._del) { el._del.remove(); el._del = null; }
       render();
     }
   };
@@ -245,6 +288,38 @@ const dirty = new Set();
 function markDirty(p, el){
   dirty.add(p.date); el.classList.add('dirty'); savebar();
 }
+function nextFreeDate(){
+  const used = new Set(POSTS.map(p=>p.date));
+  let d = POSTS.length
+    ? new Date(POSTS[POSTS.length-1].date + 'T12:00:00Z')
+    : new Date();
+  for (let i=0;i<400;i++){
+    d.setUTCDate(d.getUTCDate()+1);
+    const iso = d.toISOString().slice(0,10);
+    if (!used.has(iso)) return iso;
+  }
+  return new Date().toISOString().slice(0,10);
+}
+
+function newPost(){
+  const p = {
+    date: nextFreeDate(),
+    brand: 'community',
+    bio_link: 'https://www.racquetpoint.com',
+    text: '',
+    ig_caption: ''
+  };
+  POSTS.push(p);
+  POSTS.sort((a,b)=>a.date.localeCompare(b.date));
+  dirty.add(p.date);
+  chrome(); draw(); rotationCheck(); savebar();
+  const cards = [...document.querySelectorAll('article')];
+  const idx = POSTS.indexOf(p);
+  const el = cards[idx];
+  if (el){ el.scrollIntoView({behavior:'smooth', block:'center'});
+           el.querySelector('.editbtn').click(); }
+}
+
 function rotationCheck(){
   const sorted = POSTS.slice().sort((a,b)=>a.date.localeCompare(b.date));
   const clash = [];
@@ -326,6 +401,7 @@ function chrome(){
     try{ LOG = await fetch(REPO_RAW + 'posts/published.json', {cache:'no-store'}).then(r=>r.json()); }
     catch(_){ LOG = {}; }
     chrome(); draw(); rotationCheck();
+    document.getElementById('newpost').onclick = newPost;
     loadImageList().then(() => {
       document.getElementById('imglist').innerHTML =
         IMAGES.map(i => `<option value="${i}">`).join('');
