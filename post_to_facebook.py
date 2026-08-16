@@ -72,25 +72,46 @@ def publish_facebook(page_id, token, text, image_path=None, image_url=None):
     return body.get("post_id") or body.get("id")
 
 
+def publish_facebook_video(page_id, token, text, video_url):
+    """Publish a video post to the Page. Different endpoint from photos."""
+    r = requests.post(
+        f"https://graph-video.facebook.com/v26.0/{page_id}/videos",
+        data={"description": text, "file_url": video_url, "access_token": token},
+        timeout=300,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"Facebook video {r.status_code}: {r.text[:600]}")
+    return r.json().get("id")
+
+
 # --------------------------------------------------------------------------- IG
 
-def publish_instagram(ig_user_id, token, caption, image_url):
-    """Two step: create a media container, wait for it, then publish it."""
-    r = requests.post(
-        f"{GRAPH}/{ig_user_id}/media",
-        data={"image_url": image_url, "caption": caption, "access_token": token},
-        timeout=120,
-    )
+def publish_instagram(ig_user_id, token, caption, image_url=None, video_url=None):
+    """
+    Two step: create a media container, wait for it, then publish it.
+
+    Instagram no longer accepts plain feed video. Video must be published as a
+    REEL, which also means it lands in the Reels tab, not just the grid.
+    Video containers take far longer to process than photos.
+    """
+    if video_url:
+        payload = {"media_type": "REELS", "video_url": video_url,
+                   "caption": caption, "access_token": token}
+        tries, wait = 40, 10        # up to ~7 minutes for transcoding
+    else:
+        payload = {"image_url": image_url, "caption": caption, "access_token": token}
+        tries, wait = 12, 5
+    r = requests.post(f"{GRAPH}/{ig_user_id}/media", data=payload, timeout=180)
     if r.status_code != 200:
         raise RuntimeError(
             f"Instagram container {r.status_code}: {r.text[:600]}\n"
-            f"  image_url was: {image_url}\n"
+            f"  media url was: {video_url or image_url}\n"
             f"  Instagram must be able to fetch that URL anonymously."
         )
     creation_id = r.json()["id"]
 
-    # Containers are usually ready immediately for photos, but not guaranteed.
-    for attempt in range(12):
+    # Photos are usually instant. Reels are not.
+    for attempt in range(tries):
         s = requests.get(
             f"{GRAPH}/{creation_id}",
             params={"fields": "status_code,status", "access_token": token},
@@ -101,9 +122,10 @@ def publish_instagram(ig_user_id, token, caption, image_url):
             break
         if status == "ERROR":
             raise RuntimeError(f"Instagram container failed: {s.json().get('status')}")
-        time.sleep(5)
+        time.sleep(wait)
     else:
-        raise RuntimeError("Instagram container never reached FINISHED")
+        raise RuntimeError("Instagram container never reached FINISHED "
+                           f"after {tries*wait}s")
 
     p = requests.post(
         f"{GRAPH}/{ig_user_id}/media_publish",
@@ -181,24 +203,29 @@ def main():
         elif not dry and (not page_id or not token):
             failures.append("facebook: FB_PAGE_ID or FB_PAGE_TOKEN missing")
         else:
-            remote = post.get("image_url")
-            img = None if remote else post.get("image")
-            if remote:
+            vid = post.get("video_url")
+            remote = None if vid else post.get("image_url")
+            img = None if (remote or vid) else post.get("image")
+            if vid:
+                print(f"Facebook: {len(post['text'])} chars, VIDEO {vid}")
+            elif remote:
                 print(f"Facebook: {len(post['text'])} chars, remote {remote}")
             elif img and os.path.exists(img):
                 print(f"Facebook: {len(post['text'])} chars, {img} "
                       f"({os.path.getsize(img)/1e6:.2f} MB)")
             else:
-                failures.append(f"facebook: no usable image ({img or 'none'})")
+                failures.append(f"facebook: no usable image or video ({img or 'none'})")
                 img = None
-            if remote or img:
+            if vid or remote or img:
                 if dry:
                     print("  DRY_RUN, not publishing")
                 else:
                     try:
-                        results["facebook"] = publish_facebook(
-                            page_id, token, post["text"],
-                            image_path=img, image_url=remote)
+                        results["facebook"] = (
+                            publish_facebook_video(page_id, token, post["text"], vid)
+                            if vid else
+                            publish_facebook(page_id, token, post["text"],
+                                             image_path=img, image_url=remote))
                         print(f"  published {results['facebook']}")
                     except Exception as e:
                         failures.append(f"facebook: {e}")
@@ -215,10 +242,14 @@ def main():
             failures.append("instagram: IMAGE_BASE_URL missing and post has no image_url")
         else:
             caption = post.get("ig_caption", post["text"])
+            vid = post.get("ig_video_url") or post.get("video_url")
             # A remote URL is used as-is. Otherwise build one from the repo path.
-            remote = post.get("ig_image_url") or post.get("image_url")
+            remote = None if vid else (post.get("ig_image_url") or post.get("image_url"))
             img = None
-            if remote:
+            if vid:
+                url = vid
+                print(f"Instagram: {len(caption)} chars, REEL {url}")
+            elif remote:
                 url = remote
                 print(f"Instagram: {len(caption)} chars, remote {url}")
             else:
@@ -235,7 +266,11 @@ def main():
                         try:
                             h = requests.head(url, timeout=30, allow_redirects=True)
                             ctype = (h.headers.get('content-type') or '').lower()
-                            if h.status_code == 200 and 'jpeg' in ctype:
+                            if vid and h.status_code == 200 and 'video' in ctype:
+                                print(f"  video URL reachable ({ctype})")
+                            elif vid and h.status_code == 200:
+                                warn(f"  media URL is {ctype or 'unknown'}, not video.")
+                            elif h.status_code == 200 and 'jpeg' in ctype:
                                 print(f"  image URL reachable ({ctype})")
                             elif h.status_code == 200:
                                 warn(f"  image URL is {ctype or 'unknown type'}, not JPEG. "
@@ -251,7 +286,9 @@ def main():
                 else:
                     try:
                         results["instagram"] = publish_instagram(
-                            ig_user_id, token, caption, url)
+                            ig_user_id, token, caption,
+                            image_url=None if vid else url,
+                            video_url=url if vid else None)
                         print(f"  published {results['instagram']}")
                     except Exception as e:
                         failures.append(f"instagram: {e}")
