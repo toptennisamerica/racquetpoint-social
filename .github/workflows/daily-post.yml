@@ -1,0 +1,66 @@
+name: Daily social post
+
+on:
+  schedule:
+    # 21:30 UTC = 17:30 America/New_York while EDT is in effect.
+    # GitHub cron is always UTC and does not follow DST, so after the November
+    # change this lands at 16:30 local. Switch to "30 22 * * *" to hold 17:30.
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate without publishing"
+        type: boolean
+        default: true
+      platforms:
+        description: "Which platforms to publish to"
+        type: choice
+        default: "facebook,instagram"
+        options:
+          - "facebook,instagram"
+          - "facebook"
+          - "instagram"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-social-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet requests
+
+      - name: Publish today's post
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          # Instagram fetches images over HTTP, so this must be publicly readable.
+          IMAGE_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}
+          PLATFORMS: ${{ inputs.platforms || 'facebook,instagram' }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+        run: python post_to_facebook.py
+
+      - name: Commit the publish log
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          if [[ -n "$(git status --porcelain posts/published.json)" ]]; then
+            git config user.name  "racquet-point-bot"
+            git config user.email "actions@github.com"
+            git add posts/published.json
+            git commit -m "Log published post for $(date -u +%F)"
+            git push
+          else
+            echo "No log change to commit."
+          fi
