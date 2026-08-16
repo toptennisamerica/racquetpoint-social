@@ -55,6 +55,18 @@
   .bio{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
   .empty{padding:60px 20px;text-align:center;color:var(--muted)}
   code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
+  textarea.edit{width:100%;min-height:190px;resize:vertical;font:inherit;font-size:13.5px;line-height:1.5;
+    color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:9px}
+  input.edit{width:100%;font:inherit;font-size:12.5px;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+  article.dirty{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .savebar{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;z-index:50;
+    background:var(--ink);color:var(--bg);border-radius:12px;padding:11px 14px;display:flex;gap:10px;
+    align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.28);font-size:13.5px}
+  .savebar button{font:inherit;font-size:13px;font-weight:600;border:0;border-radius:8px;padding:7px 12px;cursor:pointer}
+  .savebar .primary{background:var(--accent);color:#fff}
+  .savebar .ghost{background:transparent;color:var(--bg);border:1px solid rgba(255,255,255,.3)}
+  .savebar a{color:var(--bg)}
 </style>
 </head>
 <body>
@@ -114,13 +126,15 @@ function card(p){
       </div>
       <p class="txt clamp"></p>
       <button class="more">Show more</button>
+      <button class="tab editbtn" style="align-self:flex-start">Edit</button>
     </div>
     <footer class="meta">
       ${platforms.map(x=>`<span class="pill${done[x]?' ok':''}">${x}${done[x]?' ✓':''}</span>`).join('')}
       ${p.bio_link?`<a class="bio" href="${p.bio_link}" target="_blank" rel="noopener">bio link ↗</a>`:''}
     </footer>`;
 
-  const fig = el.querySelector('figure'), txt = el.querySelector('.txt');
+  const fig = el.querySelector('figure');
+  let txt = el.querySelector('.txt');
   const more = el.querySelector('.more');
   let view = 'fb';
 
@@ -129,17 +143,77 @@ function card(p){
     txt.textContent = ig ? (p.ig_caption || p.text) : p.text;
     const src = imgFor(p, ig);
     fig.innerHTML = src ? `<img loading="lazy" alt="" src="${src}">` : '';
-    el.querySelectorAll('.tab').forEach(b =>
+    el.querySelectorAll('.tab[data-v]').forEach(b =>
       b.setAttribute('aria-pressed', String(b.dataset.v === view)));
   };
-  el.querySelectorAll('.tab').forEach(b =>
+  el.querySelectorAll('.tab[data-v]').forEach(b =>
     b.onclick = () => { view = b.dataset.v; render(); });
+
+  let editing = false;
+  const editBtn = el.querySelector('.editbtn');
+  editBtn.onclick = () => {
+    if (!editing){
+      editing = true; editBtn.textContent = 'Done';
+      more.hidden = true;
+      const ta = document.createElement('textarea');
+      ta.className = 'edit';
+      ta.value = view === 'ig' ? (p.ig_caption || p.text) : p.text;
+      ta.oninput = () => {
+        if (view === 'ig') p.ig_caption = ta.value; else p.text = ta.value;
+        markDirty(p, el);
+      };
+      txt.replaceWith(ta); txt = ta;
+      const bio = document.createElement('input');
+      bio.className='edit'; bio.value = p.bio_link || ''; bio.placeholder='bio link';
+      bio.oninput = () => { p.bio_link = bio.value; markDirty(p, el); };
+      ta.after(bio); el._bio = bio;
+    } else {
+      editing = false; editBtn.textContent = 'Edit';
+      more.hidden = false;
+      const pEl = document.createElement('p');
+      pEl.className = 'txt clamp';
+      txt.replaceWith(pEl); txt = pEl;
+      if (el._bio) { el._bio.remove(); el._bio = null; }
+      render();
+    }
+  };
   more.onclick = () => {
     const on = txt.classList.toggle('clamp');
     more.textContent = on ? 'Show more' : 'Show less';
   };
   render();
   return el;
+}
+
+const dirty = new Set();
+function markDirty(p, el){
+  dirty.add(p.date); el.classList.add('dirty'); savebar();
+}
+function savebar(){
+  let bar = document.getElementById('savebar');
+  if (!dirty.size){ if (bar) bar.remove(); return; }
+  if (!bar){
+    bar = document.createElement('div');
+    bar.id='savebar'; bar.className='savebar';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<span><strong>${dirty.size}</strong> edited</span>
+    <button class="primary" id="cp">Copy updated queue.json</button>
+    <button class="ghost" id="gh">Open GitHub editor</button>
+    <button class="ghost" id="dc">Discard</button>`;
+  bar.querySelector('#cp').onclick = async e => {
+    const out = JSON.stringify({timezone:'America/New_York', posts:POSTS}, null, 2);
+    try { await navigator.clipboard.writeText(out); e.target.textContent='Copied ✓'; }
+    catch(_){
+      const b=new Blob([out],{type:'application/json'}), u=URL.createObjectURL(b);
+      const a=document.createElement('a'); a.href=u; a.download='queue.json'; a.click();
+      e.target.textContent='Downloaded ✓';
+    }
+    setTimeout(()=>{ e.target.textContent='Copy updated queue.json'; }, 2500);
+  };
+  bar.querySelector('#gh').onclick = () => window.open(
+    'https://github.com/toptennisamerica/racquetpoint-social/edit/main/posts/queue.json','_blank');
+  bar.querySelector('#dc').onclick = () => location.reload();
 }
 
 function draw(){
