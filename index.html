@@ -32,7 +32,8 @@
   article{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
     display:flex;flex-direction:column}
   article.past{opacity:.5}
-  .top{padding:12px 14px;display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--line)}
+  .top{padding:12px 14px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line)}
   .date{font-weight:650;font-size:14px}
   .dow{color:var(--muted);font-size:12.5px}
   .chip{margin-left:auto;font-size:11px;font-weight:650;letter-spacing:.03em;text-transform:uppercase;
@@ -58,9 +59,11 @@
   .pill .n{font-weight:700;margin-left:5px;color:var(--ink)}
   .eng{margin-left:auto;font-size:11px;color:var(--muted)}
   .eng b{color:var(--ink);font-size:12.5px}
-  /* engagement badge in the card header, so it is visible without scrolling */
-  .engtop{font-size:11.5px;font-weight:700;color:var(--ink);background:var(--bg);
-    border:1px solid var(--line);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  /* engagement badges in the card header, one per platform, no scrolling needed */
+  .engtop{font-size:11px;font-weight:700;background:var(--bg);border:1px solid currentColor;
+    border-radius:6px;padding:2px 6px;white-space:nowrap}
+  .engtop.fb{color:#1877f2}
+  .engtop.ig{color:#c13584}
   .engtop.zero{color:var(--muted);font-weight:600}
   .bio{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
   .empty{padding:60px 20px;text-align:center;color:var(--muted)}
@@ -170,14 +173,14 @@ function card(p){
     <div class="top">
       <span class="date">${f.date}</span><span class="dow">${f.dow} · ${p.time || DEFAULT_TIME}</span>
       <span class="chip" style="background:${chipColor(brand)}">${brand}</span>
-      ${(() => {
-        const d = ENG[p.date];
-        if (!d || d.total === undefined) return '';
-        const detail = ['facebook','instagram'].filter(x => d[x])
-          .map(x => `${x === 'facebook' ? 'FB' : 'IG'} ${engBreakdown(d[x], x)}`).join(' · ');
-        return `<span class="engtop${d.total ? '' : ' zero'}" title="${detail}">`
-             + `♥ ${d.total}</span>`;
-      })()}
+      ${['facebook','instagram'].map(x => {
+        const e = engFor(p.date, x);
+        if (!e) return '';
+        const cls = x === 'facebook' ? 'fb' : 'ig';
+        const tag = x === 'facebook' ? 'FB' : 'IG';
+        return `<span class="engtop ${cls}${e.total ? '' : ' zero'}" `
+             + `title="${tag} ${engBreakdown(e, x)}">${tag} ♥${e.total}</span>`;
+      }).join('')}
     </div>
     <figure></figure>
     <div class="body">
