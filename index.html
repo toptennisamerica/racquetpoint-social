@@ -58,6 +58,10 @@
   .pill .n{font-weight:700;margin-left:5px;color:var(--ink)}
   .eng{margin-left:auto;font-size:11px;color:var(--muted)}
   .eng b{color:var(--ink);font-size:12.5px}
+  /* engagement badge in the card header, so it is visible without scrolling */
+  .engtop{font-size:11.5px;font-weight:700;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .engtop.zero{color:var(--muted);font-weight:600}
   .bio{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
   .empty{padding:60px 20px;text-align:center;color:var(--muted)}
   code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
@@ -166,6 +170,14 @@ function card(p){
     <div class="top">
       <span class="date">${f.date}</span><span class="dow">${f.dow} · ${p.time || DEFAULT_TIME}</span>
       <span class="chip" style="background:${chipColor(brand)}">${brand}</span>
+      ${(() => {
+        const d = ENG[p.date];
+        if (!d || d.total === undefined) return '';
+        const detail = ['facebook','instagram'].filter(x => d[x])
+          .map(x => `${x === 'facebook' ? 'FB' : 'IG'} ${engBreakdown(d[x], x)}`).join(' · ');
+        return `<span class="engtop${d.total ? '' : ' zero'}" title="${detail}">`
+             + `♥ ${d.total}</span>`;
+      })()}
     </div>
     <figure></figure>
     <div class="body">
