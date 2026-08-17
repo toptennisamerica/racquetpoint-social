@@ -55,6 +55,9 @@
     display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pill{border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px}
   .pill.ok{color:var(--ok);border-color:currentColor}
+  .pill .n{font-weight:700;margin-left:5px;color:var(--ink)}
+  .eng{margin-left:auto;font-size:11px;color:var(--muted)}
+  .eng b{color:var(--ink);font-size:12.5px}
   .bio{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
   .empty{padding:60px 20px;text-align:center;color:var(--muted)}
   code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
@@ -99,7 +102,22 @@ const REPO_RAW = location.hostname.endsWith('github.io')
   ? '' // same origin when served by Pages
   : 'https://raw.githubusercontent.com/toptennisamerica/racquetpoint-social/main/';
 
-let POSTS = [], LOG = {}, filter = 'all', IMAGES = [], DEFAULT_TIME = '17:30';
+let POSTS = [], LOG = {}, ENG = {}, filter = 'all', IMAGES = [], DEFAULT_TIME = '17:30';
+
+// Engagement comes from posts/engagement.json, written by the Collect engagement
+// action. Numbers only. The token stays in GitHub secrets, never in this page.
+function engFor(date, platform){
+  const d = ENG[date];
+  return (d && d[platform]) ? d[platform] : null;
+}
+function engBreakdown(e, platform){
+  if (!e) return '';
+  const parts = platform === 'facebook'
+    ? [[e.reactions,'reactions'],[e.comments,'comments'],[e.shares,'shares']]
+    : [[e.likes,'likes'],[e.comments,'comments']];
+  const s = parts.filter(([n]) => n).map(([n,l]) => `${n} ${l}`).join(', ');
+  return s || 'nothing yet';
+}
 
 async function loadImageList(){
   const api = 'https://api.github.com/repos/toptennisamerica/racquetpoint-social/contents/';
@@ -160,7 +178,13 @@ function card(p){
       <button class="tab editbtn" style="align-self:flex-start">Edit</button>
     </div>
     <footer class="meta">
-      ${platforms.map(x=>`<span class="pill${done[x]?' ok':''}">${x}${done[x]?' ✓':''}</span>`).join('')}
+      ${platforms.map(x => {
+        const e = done[x] ? engFor(p.date, x) : null;
+        return `<span class="pill${done[x]?' ok':''}"${e?` title="${engBreakdown(e,x)}"`:''}>`
+             + `${x}${done[x]?' ✓':''}${e?`<span class="n">${e.total}</span>`:''}</span>`;
+      }).join('')}
+      ${(ENG[p.date] && ENG[p.date].total !== undefined)
+        ? `<span class="eng"><b>${ENG[p.date].total}</b> total</span>` : ''}
       ${p.bio_link?`<a class="bio" href="${p.bio_link}" target="_blank" rel="noopener">bio link ↗</a>`:''}
     </footer>`;
 
@@ -415,9 +439,30 @@ function chrome(){
   BRANDS.filter(b=>counts[b]).forEach(b => mk(b, `${b} ${counts[b]}`));
 
   const upcoming = POSTS.filter(p => p.date >= todayNY()).length;
-  document.getElementById('summary').textContent =
-    `${POSTS.length} posts · ${POSTS[0].date} to ${POSTS[POSTS.length-1].date} · `
-    + `${upcoming} still to publish · 5:30pm ET daily`;
+  let line = `${POSTS.length} posts · ${POSTS[0].date} to ${POSTS[POSTS.length-1].date} · `
+           + `${upcoming} still to publish · ${DEFAULT_TIME} ET daily`;
+
+  // Followers as of Aug 2026. Used only to put the average on the same footing
+  // as the competitor benchmark, which was engagement per 10K followers.
+  const FOLLOWERS = {facebook: 1200, instagram: 952};
+  const BENCHMARK = 8.7;   // Tennis Warehouse, per 10K, Jul-Aug 2026
+
+  const bits = [];
+  for (const plat of ['facebook','instagram']){
+    const vals = Object.keys(ENG).filter(k => k !== 'updated')
+      .map(k => ENG[k][plat]).filter(Boolean).map(e => e.total);
+    if (!vals.length) continue;
+    const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+    const per10k = avg / FOLLOWERS[plat] * 10000;
+    bits.push(plat === 'facebook'
+      ? `Facebook ${avg.toFixed(1)} avg over ${vals.length} `
+        + `(${per10k.toFixed(1)} per 10K vs benchmark ${BENCHMARK})`
+      : `Instagram ${avg.toFixed(1)} avg over ${vals.length} (${per10k.toFixed(1)} per 10K)`);
+  }
+  if (bits.length) line += `<br>${bits.join(' · ')}`;
+  else if (Object.keys(LOG).length) line += `<br>Engagement not collected yet.`;
+
+  document.getElementById('summary').innerHTML = line;
 }
 
 (async () => {
@@ -427,6 +472,9 @@ function chrome(){
     POSTS = q.posts.slice().sort((a,b)=>a.date.localeCompare(b.date));
     try{ LOG = await fetch(REPO_RAW + 'posts/published.json', {cache:'no-store'}).then(r=>r.json()); }
     catch(_){ LOG = {}; }
+    // Absent until the Collect engagement action has run at least once.
+    try{ ENG = await fetch(REPO_RAW + 'posts/engagement.json', {cache:'no-store'}).then(r=>r.json()); }
+    catch(_){ ENG = {}; }
     chrome(); draw(); rotationCheck();
     document.getElementById('newpost').onclick = newPost;
     loadImageList().then(() => {
