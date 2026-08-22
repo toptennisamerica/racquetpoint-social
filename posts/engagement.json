@@ -2,9 +2,9 @@
   "2026-08-16": {
     "facebook": {
       "comments": 0,
-      "reactions": 1,
+      "reactions": 2,
       "shares": 0,
-      "total": 1
+      "total": 2
     },
     "instagram": {
       "comments": 0,
@@ -12,39 +12,9 @@
       "permalink": "https://www.instagram.com/p/DcHvHI6IJj6/",
       "total": 1
     },
-    "total": 2
-  },
-  "2026-08-17": {
-    "facebook": {
-      "comments": 0,
-      "reactions": 1,
-      "shares": 0,
-      "total": 1
-    },
-    "instagram": {
-      "comments": 0,
-      "likes": 2,
-      "permalink": "https://www.instagram.com/p/DcKHermlZ5w/",
-      "total": 2
-    },
     "total": 3
   },
-  "2026-08-18": {
-    "facebook": {
-      "comments": 0,
-      "reactions": 0,
-      "shares": 0,
-      "total": 0
-    },
-    "instagram": {
-      "comments": 0,
-      "likes": 1,
-      "permalink": "https://www.instagram.com/p/DcMsUQEk3W3/",
-      "total": 1
-    },
-    "total": 1
-  },
-  "2026-08-19": {
+  "2026-08-17": {
     "facebook": {
       "comments": 0,
       "reactions": 2,
@@ -53,11 +23,41 @@
     },
     "instagram": {
       "comments": 0,
+      "likes": 2,
+      "permalink": "https://www.instagram.com/p/DcKHermlZ5w/",
+      "total": 2
+    },
+    "total": 4
+  },
+  "2026-08-18": {
+    "facebook": {
+      "comments": 0,
+      "reactions": 1,
+      "shares": 0,
+      "total": 1
+    },
+    "instagram": {
+      "comments": 0,
+      "likes": 1,
+      "permalink": "https://www.instagram.com/p/DcMsUQEk3W3/",
+      "total": 1
+    },
+    "total": 2
+  },
+  "2026-08-19": {
+    "facebook": {
+      "comments": 0,
+      "reactions": 3,
+      "shares": 0,
+      "total": 3
+    },
+    "instagram": {
+      "comments": 0,
       "likes": 1,
       "permalink": "https://www.instagram.com/p/DcPRKjtFP35/",
       "total": 1
     },
-    "total": 3
+    "total": 4
   },
   "2026-08-20": {
     "instagram": {
@@ -68,5 +68,20 @@
     },
     "total": 12
   },
-  "updated": "2026-08-21T18:52:14+00:00"
+  "2026-08-21": {
+    "facebook": {
+      "comments": 0,
+      "reactions": 1,
+      "shares": 0,
+      "total": 1
+    },
+    "instagram": {
+      "comments": 0,
+      "likes": 1,
+      "permalink": "https://www.instagram.com/p/DcUauOPo0dA/",
+      "total": 1
+    },
+    "total": 2
+  },
+  "updated": "2026-08-22T01:47:15+00:00"
 }
