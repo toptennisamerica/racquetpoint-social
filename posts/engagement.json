@@ -113,5 +113,20 @@
     },
     "total": 3
   },
-  "updated": "2026-08-24T18:55:20+00:00"
+  "2026-08-24": {
+    "facebook": {
+      "comments": 0,
+      "reactions": 0,
+      "shares": 0,
+      "total": 0
+    },
+    "instagram": {
+      "comments": 0,
+      "likes": 1,
+      "permalink": "https://www.instagram.com/p/DccJaWCHDwo/",
+      "total": 1
+    },
+    "total": 1
+  },
+  "updated": "2026-08-25T01:48:24+00:00"
 }
