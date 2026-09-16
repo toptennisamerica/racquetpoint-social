@@ -392,5 +392,20 @@
     },
     "total": 1
   },
-  "updated": "2026-09-15T21:15:32+00:00"
+  "2026-09-15": {
+    "facebook": {
+      "comments": 0,
+      "reactions": 0,
+      "shares": 0,
+      "total": 0
+    },
+    "instagram": {
+      "comments": 0,
+      "likes": 2,
+      "permalink": "https://www.instagram.com/p/DdU6NYhlV0a/",
+      "total": 2
+    },
+    "total": 2
+  },
+  "updated": "2026-09-16T04:42:50+00:00"
 }
